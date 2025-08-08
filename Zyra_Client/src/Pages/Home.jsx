@@ -161,8 +161,16 @@ function Home() {
     };
 
     recognition.onresult = async (e) => {
-      const transcript = e.results[e.results.length - 1][0].transcript.trim();
-      console.log("Heard:", transcript);
+      const lastIndex = e.results.length - 1;
+      const lastResult = e.results[lastIndex];
+
+      if (!lastResult.isFinal) {
+        // Ignore interim results to prevent multiple calls
+        return;
+      }
+
+      const transcript = lastResult[0].transcript.trim();
+      console.log("Heard final:", transcript);
 
       // Language switching via voice command
       if (transcript.toLowerCase().includes("speak in hindi")) {
@@ -196,6 +204,7 @@ function Home() {
         speak(language === "hi-IN" ? "माफ़ कीजिए, मैं नहीं समझ पाया।" : "Sorry, I didn't understand that.");
       }
     };
+
 
     // Fallback interval in case recognition stops
     const fallbackInterval = setInterval(() => {
