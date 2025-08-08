@@ -36,7 +36,6 @@ public class AssistantHandler implements HttpHandler {
         System.out.println("AssistantHandler: Handling " + exchange.getRequestMethod() + " " + exchange.getRequestURI());
 
         if (CorsUtils.handlePreflight(exchange)) return;
-        CorsUtils.addCorsHeaders(exchange);
 
         MongoDBConnection db = MongoDBConnection.getInstance();
 
@@ -50,6 +49,7 @@ public class AssistantHandler implements HttpHandler {
             default:
                 String response = new JSONObject().put("message", "Invalid action").toString();
                 sendResponse(exchange, 400, response);
+                return;
         }
     }
 
@@ -114,18 +114,15 @@ public class AssistantHandler implements HttpHandler {
         JSONObject gemResult;
 
         try {
-            // Clean up code block formatting if present
             String cleanedResponse = geminiResponse.trim();
 
             if (cleanedResponse.startsWith("```")) {
-                // Strip ```json or ``` and ending ```
                 cleanedResponse = cleanedResponse.replaceAll("^```[a-zA-Z]*\\s*", "").replaceAll("\\s*```$", "");
             }
 
             gemResult = new JSONObject(cleanedResponse);
 
         } catch (Exception e) {
-            // Fallback if still not parsable
             JSONObject fallback = new JSONObject()
                     .put("type", "general")
                     .put("userInput", command)
@@ -134,8 +131,6 @@ public class AssistantHandler implements HttpHandler {
             sendResponse(exchange, 200, fallback.toString());
             return;
         }
-
-
 
         String type = gemResult.optString("type");
         String userInput = gemResult.optString("userInput");

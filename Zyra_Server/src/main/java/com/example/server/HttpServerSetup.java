@@ -25,25 +25,35 @@ public class HttpServerSetup {
 
         // Serve static files from /public
         server.createContext("/public", exchange -> {
-            CorsUtils.addCorsHeaders(exchange); // Allow public file requests from frontend
-            URI uri = exchange.getRequestURI();
-            String filePath = uri.getPath().replaceFirst("/public", "public");
-            File file = new File(filePath);
+            try {
+                CorsUtils.addCorsHeaders(exchange); // Allow public file requests from frontend
+                URI uri = exchange.getRequestURI();
+                String filePath = uri.getPath().replaceFirst("/public", "public");
+                File file = new File(filePath);
 
-            if (file.exists() && !file.isDirectory()) {
-                String mime = Files.probeContentType(file.toPath());
-                if (mime == null) mime = "application/octet-stream";
+                if (file.exists() && !file.isDirectory()) {
+                    String mime = Files.probeContentType(file.toPath());
+                    if (mime == null) mime = "application/octet-stream";
 
-                byte[] bytes = Files.readAllBytes(file.toPath());
-                exchange.getResponseHeaders().add("Content-Type", mime);
-                exchange.sendResponseHeaders(200, bytes.length);
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write(bytes);
+                    byte[] bytes = Files.readAllBytes(file.toPath());
+                    exchange.getResponseHeaders().add("Content-Type", mime);
+                    exchange.sendResponseHeaders(200, bytes.length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(bytes);
+                    }
+                } else {
+                    exchange.sendResponseHeaders(404, -1);
                 }
-            } else {
-                exchange.sendResponseHeaders(404, -1);
+            } catch (IOException e) {
+                e.printStackTrace();
+                try {
+                    exchange.sendResponseHeaders(500, -1);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            } finally {
+                exchange.close();
             }
-            exchange.close();
         });
 
         // Auth routes

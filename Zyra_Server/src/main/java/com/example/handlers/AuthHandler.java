@@ -28,7 +28,7 @@ public class AuthHandler implements HttpHandler {
     public void handle(HttpExchange exchange) throws IOException {
         System.out.println("AuthHandler: Handling " + exchange.getRequestMethod() + " " + exchange.getRequestURI());
 
-        // Handle preflight (OPTIONS) requests — returns immediately if it's a preflight
+        // Handle OPTIONS preflight — stops execution here
         if (CorsUtils.handlePreflight(exchange)) return;
 
         MongoDBConnection db = MongoDBConnection.getInstance();
@@ -36,20 +36,20 @@ public class AuthHandler implements HttpHandler {
         switch (action) {
             case "signup":
                 handleSignup(exchange, db);
-                return;
+                break;
             case "signin":
                 handleSignin(exchange, db);
-                return;
+                break;
             case "logout":
                 handleLogout(exchange);
-                return;
+                break;
             default:
                 sendResponse(exchange, 400, new JSONObject().put("message", "Invalid action").toString());
         }
     }
 
     private void handleSignup(HttpExchange exchange, MongoDBConnection db) throws IOException {
-        if (!"POST".equals(exchange.getRequestMethod())) {
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
             sendResponse(exchange, 405, new JSONObject().put("message", "Method not allowed").toString());
             return;
         }
@@ -80,7 +80,7 @@ public class AuthHandler implements HttpHandler {
 
         String token = JwtUtils.generateToken(user.getId());
 
-        // Include cookie with SameSite=None and Secure for cross-origin
+        // Set auth cookie
         exchange.getResponseHeaders().add(
                 "Set-Cookie", "token=" + token + "; Path=/; HttpOnly; SameSite=None; Secure"
         );
@@ -93,7 +93,7 @@ public class AuthHandler implements HttpHandler {
     }
 
     private void handleSignin(HttpExchange exchange, MongoDBConnection db) throws IOException {
-        if (!"POST".equals(exchange.getRequestMethod())) {
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
             sendResponse(exchange, 405, new JSONObject().put("message", "Method not allowed").toString());
             return;
         }
@@ -132,11 +132,12 @@ public class AuthHandler implements HttpHandler {
     }
 
     private void handleLogout(HttpExchange exchange) throws IOException {
-        if (!"GET".equals(exchange.getRequestMethod())) {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
             sendResponse(exchange, 405, new JSONObject().put("message", "Method not allowed").toString());
             return;
         }
 
+        // Expire the cookie
         exchange.getResponseHeaders().add(
                 "Set-Cookie", "token=; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=0"
         );
@@ -145,7 +146,7 @@ public class AuthHandler implements HttpHandler {
     }
 
     private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
-        // Apply CORS only here (not in handle())
+        // CORS headers for actual responses
         CorsUtils.addCorsHeaders(exchange);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         byte[] bytes = response.getBytes(StandardCharsets.UTF_8);

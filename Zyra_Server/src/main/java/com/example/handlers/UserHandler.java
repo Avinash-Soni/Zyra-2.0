@@ -25,8 +25,8 @@ public class UserHandler implements HttpHandler {
     public void handle(HttpExchange exchange) throws IOException {
         System.out.println("UserHandler: Handling " + exchange.getRequestMethod() + " " + exchange.getRequestURI());
 
+        // Handle preflight requests
         if (CorsUtils.handlePreflight(exchange)) return;
-        CorsUtils.addCorsHeaders(exchange);
 
         if (!"GET".equals(exchange.getRequestMethod())) {
             sendJsonResponse(exchange, 405, Map.of("message", "Method not allowed"));
@@ -47,21 +47,26 @@ public class UserHandler implements HttpHandler {
 
             if (user == null) {
                 sendJsonResponse(exchange, 404, Map.of("message", "User not found"));
-            } else {
-                JSONObject userJson = user.toJson().put("password", JSONObject.NULL);
-                sendJsonResponse(exchange, 200, userJson.toMap());
+                return;
             }
+
+            JSONObject userJson = user.toJson().put("password", JSONObject.NULL);
+            sendJsonResponse(exchange, 200, userJson.toMap());
         } else {
             sendJsonResponse(exchange, 400, Map.of("message", "Invalid action"));
         }
     }
 
     private void sendJsonResponse(HttpExchange exchange, int statusCode, Map<String, Object> data) throws IOException {
+        // Add CORS here once
         CorsUtils.addCorsHeaders(exchange);
+
         JSONObject json = new JSONObject(data);
         byte[] responseBytes = json.toString().getBytes(StandardCharsets.UTF_8);
+
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         exchange.sendResponseHeaders(statusCode, responseBytes.length);
+
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(responseBytes);
         }
