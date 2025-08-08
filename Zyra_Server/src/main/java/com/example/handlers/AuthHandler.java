@@ -28,8 +28,8 @@ public class AuthHandler implements HttpHandler {
     public void handle(HttpExchange exchange) throws IOException {
         System.out.println("AuthHandler: Handling " + exchange.getRequestMethod() + " " + exchange.getRequestURI());
 
+        // Handle preflight (OPTIONS) requests — returns immediately if it's a preflight
         if (CorsUtils.handlePreflight(exchange)) return;
-        CorsUtils.addCorsHeaders(exchange);
 
         MongoDBConnection db = MongoDBConnection.getInstance();
 
@@ -87,7 +87,7 @@ public class AuthHandler implements HttpHandler {
 
         JSONObject userJson = user.toJson()
                 .put("password", JSONObject.NULL)
-                .put("token", token); // also return token in JSON
+                .put("token", token);
 
         sendResponse(exchange, 201, userJson.toString());
     }
@@ -145,11 +145,13 @@ public class AuthHandler implements HttpHandler {
     }
 
     private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
+        // Apply CORS only here (not in handle())
         CorsUtils.addCorsHeaders(exchange);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(statusCode, response.getBytes().length);
+        byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(statusCode, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
-            os.write(response.getBytes(StandardCharsets.UTF_8));
+            os.write(bytes);
         }
     }
 }
