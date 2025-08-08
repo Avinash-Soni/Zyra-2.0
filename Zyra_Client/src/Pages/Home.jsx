@@ -160,27 +160,22 @@ function Home() {
       console.warn("Recognition error:", event.error);
     };
 
-    const isHandlingRef = useRef(false);
-
     recognition.onresult = async (e) => {
-      if (isHandlingRef.current) return; // Ignore if already processing a result
-      isHandlingRef.current = true;
+      const transcript = e.results[e.results.length - 1][0].transcript.trim();
+      console.log("Heard:", transcript);
+
+      // Language switching via voice command
+      if (transcript.toLowerCase().includes("speak in hindi")) {
+        setLanguage("hi-IN");
+        speak("अब मैं हिंदी में बात करूंगा");
+        return;
+      } else if (transcript.toLowerCase().includes("speak in english")) {
+        setLanguage("en-US");
+        speak("Now I will speak in English");
+        return;
+      }
 
       try {
-        const transcript = e.results[e.results.length - 1][0].transcript.trim();
-        console.log("Heard:", transcript);
-
-        // Language switching via voice command
-        if (transcript.toLowerCase().includes("speak in hindi")) {
-          setLanguage("hi-IN");
-          speak("अब मैं हिंदी में बात करूंगा");
-          return;
-        } else if (transcript.toLowerCase().includes("speak in english")) {
-          setLanguage("en-US");
-          speak("Now I will speak in English");
-          return;
-        }
-
         setUserText(transcript);
         setAiText("");
         recognition.stop();
@@ -199,11 +194,8 @@ function Home() {
       } catch (err) {
         console.error("Gemini response error:", err);
         speak(language === "hi-IN" ? "माफ़ कीजिए, मैं नहीं समझ पाया।" : "Sorry, I didn't understand that.");
-      } finally {
-        isHandlingRef.current = false;
       }
     };
-
 
     // Fallback interval in case recognition stops
     const fallbackInterval = setInterval(() => {
