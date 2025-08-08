@@ -118,17 +118,28 @@ function Home() {
     }
   };
 
-  // Main speech recognition and interaction logic
+  // Main speech recognition and interaction logic with improved handling
   useEffect(() => {
     if (!userData?.assistantName) return;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn("SpeechRecognition API not supported");
+      return;
+    }
+
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
+
+    // Detect mobile user agent
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
     recognition.lang = language;
     recognitionRef.current = recognition;
 
-    // Function to safely start recognition
+    let lastTranscript = ""; // For deduplication
+
+    // Safely start recognition without throwing on invalid state
     const safeRecognition = () => {
       if (!isSpeakingRef.current && !isRecognizingRef.current) {
         try {
@@ -152,6 +163,11 @@ function Home() {
       isRecognizingRef.current = false;
       setListening(false);
       console.log("Recognition ended");
+
+      // Restart recognition automatically on desktop, but less often or not on mobile
+      if (!isMobile) {
+        safeRecognition();
+      }
     };
 
     recognition.onerror = (event) => {
@@ -164,15 +180,16 @@ function Home() {
       const lastIndex = e.results.length - 1;
       const lastResult = e.results[lastIndex];
 
-      if (!lastResult.isFinal) {
-        // Ignore interim results to prevent multiple calls
-        return;
-      }
+      if (!lastResult.isFinal) return;
 
       const transcript = lastResult[0].transcript.trim();
+
+      // Ignore repeated transcripts to avoid double response on mobile
+      if (transcript === lastTranscript) return;
+      lastTranscript = transcript;
+
       console.log("Heard final:", transcript);
 
-      // Language switching via voice command
       if (transcript.toLowerCase().includes("speak in hindi")) {
         setLanguage("hi-IN");
         speak("अब मैं हिंदी में बात करूंगा");
@@ -205,151 +222,154 @@ function Home() {
       }
     };
 
-
-    // Fallback interval in case recognition stops
-    const fallbackInterval = setInterval(() => {
+    // Fallback interval to restart recognition only on desktop, not mobile to avoid duplicates
+    const fallbackInterval = isMobile ? null : setInterval(() => {
       safeRecognition();
     }, 5000);
 
     safeRecognition();
 
     return () => {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.onstart = null;
       recognition.abort();
       recognition.stop();
       setListening(false);
       isRecognizingRef.current = false;
-      clearInterval(fallbackInterval);
+      if (fallbackInterval) clearInterval(fallbackInterval);
     };
   }, [userData?.assistantName, language]);
 
   // UI Rendering
   return (
     <div className="w-full min-h-screen overflow-hidden bg-gradient-to-t from-black to-[#030353] flex flex-col items-center justify-center gap-4">
-  {/* Hamburger icon (for mobile) */}
-  <TfiMenu
-    className="lg:hidden text-white absolute top-[20px] right-[20px] w-[25px] h-[25px]"
-    onClick={() => setHam(true)}
-  />
-
-  {/* Hamburger menu panel (Mobile) */}
-  <div
-    className={`absolute lg:hidden top-0 left-0 w-full h-full bg-black/60 backdrop-blur-md flex flex-col px-6 py-8 gap-6 z-50 transition-transform duration-300 ease-in-out ${
-      ham ? "translate-x-0" : "-translate-x-full"
-    }`}
-  >
-    <ImCross
-      className="text-white absolute top-4 right-4 w-6 h-6 cursor-pointer"
-      onClick={() => setHam(false)}
-    />
-
-    <div className="flex flex-col gap-4 mt-10">
-      <button
-        className="w-full py-3 bg-white text-black text-base font-semibold rounded-full shadow-md hover:bg-gray-200 transition cursor-pointer"
-        onClick={handleLogOut}
-      >
-        Log out
-      </button>
-      <button
-        className="w-full py-3 bg-white text-black text-base font-semibold rounded-full shadow-md hover:bg-gray-200 transition cursor-pointer"
-        onClick={() => navigate("/customize")}
-      >
-        Customize your assistant
-      </button>
-    </div>
-
-    <div className="w-full h-px bg-gray-400 my-4" />
-
-    <h2 className="text-white text-lg font-semibold">History</h2>
-    <div className="w-full flex-1 overflow-y-auto bg-white/10 rounded-lg p-4 shadow-inner">
-      {userData.history?.length ? (
-        userData.history.map((his, index) => (
-          <p
-            key={index}
-            className="text-white text-sm mb-2 break-words border-b border-white/20 pb-1"
-          >
-            {his}
-          </p>
-        ))
-      ) : (
-        <p className="text-white text-sm italic">No history available.</p>
-      )}
-    </div>
-  </div>
-
-  {/* Hamburger icon (for desktop) */}
-  {!ham && (
-    <TfiMenu
-      className="hidden lg:block text-white fixed top-5 right-5 z-50 w-6 h-6 cursor-pointer"
-      onClick={() => setHam(true)}
-    />
-  )}
-
-  {/* Sidebar (Desktop) */}
-  {ham && (
-    <div className="fixed top-0 right-0 h-full w-[300px] bg-black/60 backdrop-blur-md px-6 py-8 gap-6 z-50 shadow-lg flex-col hidden lg:flex">
-      <ImCross
-        className="text-white absolute top-4 right-4 w-6 h-6 cursor-pointer"
-        onClick={() => setHam(false)}
+      {/* Hamburger icon (for mobile) */}
+      <TfiMenu
+        className="lg:hidden text-white absolute top-[20px] right-[20px] w-[25px] h-[25px]"
+        onClick={() => setHam(true)}
       />
 
-      <div className="flex flex-col gap-4 mt-12">
-        <button
-          className="w-full py-3 bg-white text-black text-base font-semibold rounded-full shadow-md hover:bg-gray-200 transition cursor-pointer"
-          onClick={handleLogOut}
-        >
-          Log out
-        </button>
-        <button
-          className="w-full py-3 bg-white text-black text-base font-semibold rounded-full shadow-md hover:bg-gray-200 transition cursor-pointer"
-          onClick={() => navigate("/customize")}
-        >
-          Customize your assistant
-        </button>
+      {/* Hamburger menu panel (Mobile) */}
+      <div
+        className={`absolute lg:hidden top-0 left-0 w-full h-full bg-black/60 backdrop-blur-md flex flex-col px-6 py-8 gap-6 z-50 transition-transform duration-300 ease-in-out ${
+          ham ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <ImCross
+          className="text-white absolute top-4 right-4 w-6 h-6 cursor-pointer"
+          onClick={() => setHam(false)}
+        />
+
+        <div className="flex flex-col gap-4 mt-10">
+          <button
+            className="w-full py-3 bg-white text-black text-base font-semibold rounded-full shadow-md hover:bg-gray-200 transition cursor-pointer"
+            onClick={handleLogOut}
+          >
+            Log out
+          </button>
+          <button
+            className="w-full py-3 bg-white text-black text-base font-semibold rounded-full shadow-md hover:bg-gray-200 transition cursor-pointer"
+            onClick={() => navigate("/customize")}
+          >
+            Customize your assistant
+          </button>
+        </div>
+
+        <div className="w-full h-px bg-gray-400 my-4" />
+
+        <h2 className="text-white text-lg font-semibold">History</h2>
+        <div className="w-full flex-1 overflow-y-auto bg-white/10 rounded-lg p-4 shadow-inner">
+          {userData.history?.length ? (
+            userData.history.map((his, index) => (
+              <p
+                key={index}
+                className="text-white text-sm mb-2 break-words border-b border-white/20 pb-1"
+              >
+                {his}
+              </p>
+            ))
+          ) : (
+            <p className="text-white text-sm italic">No history available.</p>
+          )}
+        </div>
       </div>
 
-      <div className="w-full h-px bg-gray-400 my-4" />
+      {/* Hamburger icon (for desktop) */}
+      {!ham && (
+        <TfiMenu
+          className="hidden lg:block text-white fixed top-5 right-5 z-50 w-6 h-6 cursor-pointer"
+          onClick={() => setHam(true)}
+        />
+      )}
 
-      <h2 className="text-white text-lg font-semibold">History</h2>
-      <div className="w-full flex-1 overflow-y-auto bg-white/10 rounded-lg p-4 shadow-inner">
-        {userData.history?.length ? (
-          userData.history.map((his, index) => (
-            <p
-              key={index}
-              className="text-white text-sm mb-2 break-words border-b border-white/20 pb-1"
+      {/* Sidebar (Desktop) */}
+      {ham && (
+        <div className="fixed top-0 right-0 h-full w-[300px] bg-black/60 backdrop-blur-md px-6 py-8 gap-6 z-50 shadow-lg flex-col hidden lg:flex">
+          <ImCross
+            className="text-white absolute top-4 right-4 w-6 h-6 cursor-pointer"
+            onClick={() => setHam(false)}
+          />
+
+          <div className="flex flex-col gap-4 mt-12">
+            <button
+              className="w-full py-3 bg-white text-black text-base font-semibold rounded-full shadow-md hover:bg-gray-200 transition cursor-pointer"
+              onClick={handleLogOut}
             >
-              {his}
-            </p>
-          ))
-        ) : (
-          <p className="text-white text-sm italic">No history available.</p>
-        )}
+              Log out
+            </button>
+            <button
+              className="w-full py-3 bg-white text-black text-base font-semibold rounded-full shadow-md hover:bg-gray-200 transition cursor-pointer"
+              onClick={() => navigate("/customize")}
+            >
+              Customize your assistant
+            </button>
+          </div>
+
+          <div className="w-full h-px bg-gray-400 my-4" />
+
+          <h2 className="text-white text-lg font-semibold">History</h2>
+          <div className="w-full flex-1 overflow-y-auto bg-white/10 rounded-lg p-4 shadow-inner">
+            {userData.history?.length ? (
+              userData.history.map((his, index) => (
+                <p
+                  key={index}
+                  className="text-white text-sm mb-2 break-words border-b border-white/20 pb-1"
+                >
+                  {his}
+                </p>
+              ))
+            ) : (
+              <p className="text-white text-sm italic">No history available.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Assistant avatar */}
+      <div className="w-[90%] max-w-[300px] h-[400px] flex justify-center items-center overflow-hidden rounded-[2rem] shadow-lg">
+        <img
+          src={userData?.assistantImage}
+          alt="Assistant"
+          className="h-full object-cover"
+        />
       </div>
+
+      {/* Assistant name display */}
+      <h1 className="text-white text-lg font-semibold text-center">
+        I'm {userData?.assistantName || "your assistant"}
+      </h1>
+
+      {/* Display AI or user image depending on response */}
+      {!aiText && <img src={userImg} alt="" className="w-[200px]" />}
+      {aiText && <img src={aiImg} alt="" className="w-[200px]" />}
+
+      {/* Display user input or AI response */}
+      <h1 className="text-white text-[18px] font-semibold text-center px-4 break-words">
+        {userText ? userText : aiText ? aiText : null}
+      </h1>
     </div>
-  )}
-
-  {/* Assistant avatar */}
-  <div className="w-[90%] max-w-[300px] h-[400px] flex justify-center items-center overflow-hidden rounded-[2rem] shadow-lg">
-    <img
-      src={userData?.assistantImage}
-      alt="Assistant"
-      className="h-full object-cover"
-    />
-  </div>
-
-  {/* Assistant name display */}
-  <h1 className="text-white text-lg font-semibold text-center">
-    I'm {userData?.assistantName || "your assistant"}
-  </h1>
-
-  {/* Display AI or user image depending on response */}
-  {!aiText && <img src={userImg} alt="" className="w-[200px]" />}
-  {aiText && <img src={aiImg} alt="" className="w-[200px]" />}
-
-  {/* Display user input or AI response */}
-  <h1 className="text-white text-[18px] font-semibold text-center px-4 break-words">
-    {userText ? userText : aiText ? aiText : null}
-  </h1>
-</div>
   );
 }
 
