@@ -19,8 +19,9 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.ZonedDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.Locale;
 
@@ -138,18 +139,24 @@ public class AssistantHandler implements HttpHandler {
 
         JSONObject responseJson = new JSONObject().put("type", type).put("userInput", userInput);
 
+        ZoneId zoneId = ZoneId.of("Asia/Kolkata"); // Change timezone as needed
+        ZonedDateTime now = ZonedDateTime.now(zoneId);
+
         switch (type) {
             case "get_date":
-                responseJson.put("response", "Current date is " + LocalDate.now());
+                responseJson.put("response", "Current date is " + now.toLocalDate());
                 break;
             case "get_time":
-                responseJson.put("response", "Current time is " + LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a")));
+                String timeFormatted = now.toLocalTime().format(DateTimeFormatter.ofPattern("hh:mm a"));
+                responseJson.put("response", "Current time is " + timeFormatted);
                 break;
             case "get_day":
-                responseJson.put("response", "Today is " + LocalDate.now().getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.US));
+                String day = now.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.US);
+                responseJson.put("response", "Today is " + day);
                 break;
             case "get_month":
-                responseJson.put("response", "Month is " + LocalDate.now().getMonth().getDisplayName(TextStyle.FULL, Locale.US));
+                String month = now.getMonth().getDisplayName(TextStyle.FULL, Locale.US);
+                responseJson.put("response", "Month is " + month);
                 break;
             case "google_search":
             case "youtube_search":
