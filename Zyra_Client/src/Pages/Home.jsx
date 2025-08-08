@@ -118,7 +118,7 @@ function Home() {
     }
   };
 
-  // Main speech recognition and interaction logic with improved handling
+  // Main speech recognition and interaction logic
   useEffect(() => {
     if (!userData?.assistantName) return;
 
